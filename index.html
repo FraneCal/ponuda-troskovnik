@@ -315,7 +315,7 @@ async function buildWorkbook(parsed,offerNo){
   // Dugi opisi se raspoređuju na više spojenih redaka (Excel ograničava visinu
   // retka na ~409 pt). Broj prelomljenih redaka mjerimo stvarnom širinom teksta
   // (canvas.measureText) da spojimo točno onoliko redaka koliko treba.
-  var USABLE_PX=497, FONT_PX=13.33, LH=13.6, PAD=12, MAXH=380;
+  var USABLE_PX=490, FONT_PX=13.33, LH=14, PAD=12, MAXH=405;
   var _mctx=null,_mtry=false;
   function measureCtx(){
     if(_mtry) return _mctx; _mtry=true;
@@ -335,11 +335,11 @@ async function buildWorkbook(parsed,offerNo){
     });
     return lines;
   }
-  function neededHeight(text){ return Math.max(18,descLineCount(text)*LH+PAD); }
+  function textHeight(text){ return Math.max(14,descLineCount(text)*LH+6); }
   var firstItem=HR+1, r=firstItem;
   (parsed.items||[]).forEach(function(it,idx){
     var text=it.description||'';
-    var H=neededHeight(text), rowsNeeded=Math.max(1,Math.ceil(H/MAXH));
+    var H=textHeight(text)+PAD, rowsNeeded=Math.max(1,Math.ceil(H/MAXH));
     var top=r, bot=r+rowsNeeded-1;
     ws.getCell('A'+top).value=it.pos?Number(it.pos):(idx+1)*10;
     ws.getCell('B'+top).value=text;
