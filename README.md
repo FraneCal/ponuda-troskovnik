@@ -13,4 +13,3 @@ Podržane su HR ponude (`Kom`, `Poz.`) i EN ponude (`PC`, `Pos.`).
 ## Zahtjevi
 
 - PDF mora imati tekstualni sloj (ne sken).
-- Za CDN (pdf.js, ExcelJS) potrebna je internetska veza pri prvom učitavanju.
