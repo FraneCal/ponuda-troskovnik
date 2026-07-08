@@ -228,6 +228,7 @@ function parseOffer(pages){
       if(items.length===0&&p>0) leadNote=block.slice(0,p).join(' ').trim();
     } else { descLines=block.slice(); }
     var code=''; for(var k=0;k<descLines.length;k++){ var a=matchArticle(descLines[k]); if(a){code=a;break;} }
+    descLines=descLines.filter(function(l){return !matchArticle(l);});
     var unit=price.unit; if(unit==null&&price.total!=null&&price.qty) unit=price.total/price.qty;
     items.push({pos:pos,code:code,description:descLines.join('\n').replace(/\n{3,}/g,'\n\n').trim(),
                 qty:price.qty,unit:unit,total:price.total,disc:price.disc});
@@ -281,7 +282,7 @@ function estRowHeight(text,cpl){
 }
 async function buildWorkbook(parsed,offerNo){
   var INK='FF14161A',ACCENT='FFEE4B12',LIGHT='FFF3F4F6',LINE='FFDDE0E4',ZEBRA='FFFAFAFB';
-  var wb=new ExcelJS.Workbook(); wb.creator='Ponuda u Troškovnik';
+  var wb=new ExcelJS.Workbook(); wb.creator='Ponuda u Troškovnik'; wb.calcProperties={fullCalcOnLoad:true};
   var ws=wb.addWorksheet('Troškovnik',{views:[{showGridLines:false}],
     pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,
       margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.2,footer:0.2}}});
@@ -362,20 +363,23 @@ async function buildWorkbook(parsed,offerNo){
   });
   var lastItem=r-1; r++;
 
-  function sumRow(label,formula,strong){
+  function sumRow(label,formula,result,strong){
     var row=ws.getRow(r); ws.mergeCells('A'+r+':C'+r);
     row.getCell(1).value=label; row.getCell(1).alignment={vertical:'middle',horizontal:'right',indent:1};
     row.getCell(1).font={name:'Calibri',size:10,bold:!!strong,color:{argb:INK}};
-    var e=row.getCell(5); e.value={formula:formula}; e.numFmt='#,##0.00';
+    var e=row.getCell(5); e.value={formula:formula,result:result}; e.numFmt='#,##0.00';
     e.font={name:'Calibri',size:10,bold:!!strong,color:{argb:strong?'FFFFFFFF':INK}};
     e.alignment={vertical:'middle',horizontal:'right'};
     for(var c=1;c<=5;c++){row.getCell(c).border=border; row.getCell(c).fill={type:'pattern',pattern:'solid',fgColor:{argb:strong?ACCENT:LIGHT}};}
     row.height=20; var cur=r; r++; return cur;
   }
   var vat=(parsed.totals&&parsed.totals.vatRate)?parsed.totals.vatRate:25;
-  var rNet=sumRow('Ukupan zbroj pozicija (neto):','SUM(E'+firstItem+':E'+lastItem+')',false);
-  var rVat=sumRow(vat+'% PDV:','E'+rNet+'*'+(vat/100),false);
-  sumRow('UKUPNO (bruto):','E'+rNet+'+E'+rVat,true);
+  var netSum=(parsed.items||[]).reduce(function(a,it){return a+(it.total||0);},0);
+  netSum=Math.round(netSum*100)/100;
+  var vatAmt=Math.round(netSum*vat)/100, gross=Math.round((netSum+vatAmt)*100)/100;
+  var rNet=sumRow('Ukupan zbroj pozicija (neto):','SUM(E'+firstItem+':E'+lastItem+')',netSum,false);
+  var rVat=sumRow(vat+'% PDV:','E'+rNet+'*'+(vat/100),vatAmt,false);
+  sumRow('UKUPNO (bruto):','E'+rNet+'+E'+rVat,gross,true);
 
   ws.views=[{state:'frozen',ySplit:HR,showGridLines:false}];
   if(lastItem>=firstItem) ws.autoFilter={from:{row:HR,column:1},to:{row:lastItem,column:5}};
