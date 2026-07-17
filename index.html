@@ -25,13 +25,11 @@
   }
   .wrap{max-width:820px; margin:0 auto}
 
-  /* header */
   header{padding:8px 0 22px; border-bottom:1px solid var(--line); margin-bottom:26px}
   .eyebrow{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent-ink); font-weight:700}
   h1{font-size:clamp(26px,7vw,38px); line-height:1.05; letter-spacing:-.02em; margin:.28em 0 .18em; font-weight:800}
   .lead{color:var(--muted); font-size:15px; max-width:56ch; margin:0}
 
-  /* dropzone — signature: prazna proračunska tablica koja se "popuni" */
   .drop{
     position:relative; display:block; width:100%; cursor:pointer;
     border:1.5px solid var(--line); border-radius:14px; overflow:hidden;
@@ -57,13 +55,11 @@
   .drop .t2 b{color:var(--accent-ink); font-weight:600}
   input[type=file]{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
 
-  /* status */
   .status{margin:16px 0 0; font-size:14px; min-height:20px; display:flex; align-items:center; gap:9px}
   .spin{width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;flex:0 0 auto}
   @keyframes s{to{transform:rotate(360deg)}}
   .err{color:var(--warn); background:var(--warn-bg); padding:12px 14px; border-radius:10px; border:1px solid #f2c9c9}
 
-  /* rezultat */
   .result{margin-top:24px; display:none}
   .result.show{display:block; animation:rise .3s ease both}
   @keyframes rise{from{opacity:0; transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -90,17 +86,18 @@
   .btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line)}
   .btn.ghost:hover{border-color:var(--ink)}
 
-  /* pregled */
   h2{font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 8px}
   .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px; -webkit-overflow-scrolling:touch}
   table{border-collapse:collapse; width:100%; font-size:13px; min-width:560px}
   th,td{padding:9px 11px; border-bottom:1px solid var(--grid); text-align:left; vertical-align:top}
   th{background:var(--ink); color:#fff; font-weight:600; font-size:11px; letter-spacing:.05em; text-transform:uppercase; position:sticky; top:0}
   tr:last-child td{border-bottom:0}
+  tr.alt td{background:#fff8f4}
   td.n{font-family:var(--mono); text-align:right; white-space:nowrap}
   td.pos{font-family:var(--mono); color:var(--accent-ink); font-weight:600}
   td.desc{min-width:240px; max-width:420px}
   td.desc .code{display:block; color:var(--muted); font-family:var(--mono); font-size:11.5px; margin-top:2px}
+  td.desc .alttag{display:inline-block; margin-top:3px; font-size:10.5px; font-weight:700; letter-spacing:.04em; color:var(--accent-ink); background:#fde8de; padding:1px 6px; border-radius:4px}
   .miss{color:var(--warn); font-family:var(--mono)}
 
   footer{margin-top:34px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px}
@@ -116,7 +113,7 @@
   <header>
     <div class="eyebrow">Strojarske ponude</div>
     <h1>Ponuda&nbsp;→&nbsp;Troškovnik</h1>
-    <p class="lead">Ubaci Viessmann PDF ponudu i preuzmi uredan Excel troškovnik. Sve se obrađuje lokalno u tvom pregledniku — nijedan dokument ne napušta uređaj.</p>
+    <p class="lead">Ubaci Viessmann PDF ponudu i preuzmi uredan Excel troškovnik. Sve se obrađuje lokalno u tvom pregledniku, nijedan dokument ne napušta uređaj.</p>
   </header>
 
   <label class="drop" id="drop" tabindex="0" role="button" aria-label="Odaberi ili ispusti PDF ponudu">
@@ -136,6 +133,7 @@
     <div class="meta" id="meta"></div>
     <div class="check" id="check"></div>
     <ul class="warns" id="warns" style="display:none"></ul>
+    <p class="note" id="altnote" style="display:none"></p>
     <p class="note" id="leadnote" style="display:none"></p>
     <div class="actions">
       <button class="btn primary" id="download">
@@ -150,7 +148,8 @@
 
   <footer>
     <p><b>Kako radi.</b> Čita se tekstualni sloj PDF-a (ne skenirane slike), stavke se izdvajaju s pozicijom, opisom, količinom i cijenom. Iz opisa se uklanja redak s cijenom/količinom, oznake prijeloma stranica i automatske napomene s kraja ponude. Zbroj se izračunava ispravnom SUM formulom, a širi opisi se prelamaju u ćeliji.</p>
-    <p style="margin-bottom:0">Ako PDF nema tekstualni sloj (čisti sken), izdvajanje neće raditi — potreban je PDF s tekstom.</p>
+    <p>Stavke označene zvjezdicom (alternative za neku poziciju) prepoznaju se i unose u Excel, ali se ne uključuju u zbroj, jednako kao u originalnoj ponudi.</p>
+    <p style="margin-bottom:0">Ako PDF nema tekstualni sloj (čisti sken), izdvajanje neće raditi, potreban je PDF s tekstom.</p>
   </footer>
 </div>
 
@@ -161,36 +160,41 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs
 /* ============================ PARSER ================================== */
 function parseNum(s){
   if(s==null) return null;
-  s=String(s).replace(/\s|EUR|€/g,'').trim(); if(!s) return null;
+  s=String(s).replace(/\s|EUR|€|\*/g,'').trim(); if(!s) return null;
   var d=s.lastIndexOf('.'), c=s.lastIndexOf(',');
   if(d===-1&&c===-1) return parseFloat(s);
   if(c>d) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,'');
   var n=parseFloat(s); return isNaN(n)?null:n;
 }
 var NUM='([\\d.,]+)';
+// HR: "2 Kom 12.003,00 EUR/Kom [Rabat u % 30,00] [neto] [*] 16.804,20 EUR"
+// Zvjezdica ispred ukupnog iznosa = alternativna stavka (ne ulazi u zbroj).
 function matchPrice(line){
   var l=line.trim();
-  var hr=l.match(new RegExp('^(\\d+)\\s+Kom\\s+'+NUM+'\\s+EUR\\/Kom\\s+(?:neto\\s+)?'+NUM+'\\s+EUR$','i'));
-  if(hr) return {qty:parseNum(hr[1]),unit:parseNum(hr[2]),total:parseNum(hr[3])};
-  var en=l.match(new RegExp('^(\\d+)\\s+PC\\s+'+NUM+'\\s+EUR\\/PC\\s*(?:Discount in %\\s+'+NUM+'\\s+)?'+NUM+'\\s+EUR$','i'));
-  if(en) return {qty:parseNum(en[1]),unit:parseNum(en[2]),disc:parseNum(en[3]),total:parseNum(en[4])};
+  var hr=l.match(new RegExp('^(\\d+)\\s+Kom\\s+'+NUM+'\\s+EUR\\/Kom\\s+(?:Rabat u %\\s+'+NUM+'\\s+)?(?:neto\\s+)?(\\*)?\\s*'+NUM+'\\s+EUR$','i'));
+  if(hr) return {qty:parseNum(hr[1]),unit:parseNum(hr[2]),disc:parseNum(hr[3]),excluded:!!hr[4],total:parseNum(hr[5])};
+  var en=l.match(new RegExp('^(\\d+)\\s+PC\\s+'+NUM+'\\s+EUR\\/PC\\s*(?:Discount in %\\s+'+NUM+'\\s+)?(\\*)?\\s*'+NUM+'\\s+EUR$','i'));
+  if(en) return {qty:parseNum(en[1]),unit:parseNum(en[2]),disc:parseNum(en[3]),excluded:!!en[4],total:parseNum(en[5])};
   return null;
 }
 function matchArticle(line){var m=line.match(/^(?:Broj narud[žz]be|Item no\.?)\s+([A-Za-z0-9\-\/.]+)/i);return m?m[1]:null;}
 function isTableHeader(l){return /^Poz\.\s+Opis materijala/i.test(l)||/^Pos\.\s+Material description/i.test(l);}
 function isFooter(l){return /^Stranica\s+\d+\s+od\s+\d+$/i.test(l.trim())||/^Page\s+\d+\s+of\s+\d+$/i.test(l.trim());}
 function isTotalsStart(l){return /^(Ukupan zbroj pozicija|Total Items)\b/i.test(l.trim());}
-function isPositionLine(l){return /^\d+\s+\S/.test(l)&&!matchPrice(l);}
+function isPositionLine(l){return /^\d+\*?\s+\S/.test(l)&&!matchPrice(l);}
 
 function extractMeta(allLines){
   var meta={offerNo:'',project:'',date:''}, text=allLines.join('\n'), m;
   if((m=text.match(/Offer[- ]?No\.?:?\s*(\d{5,})/i))) meta.offerNo=m[1];
   else if((m=text.match(/^Offer\s+(\d{5,})\s+from/im))) meta.offerNo=m[1];
+  else if((m=text.match(/Ponuda\s+(\d{5,})\s+od/i))) meta.offerNo=m[1];
   else if((m=text.match(/Ponuda\s+br\.?:?\s*(\d{5,})/i))) meta.offerNo=m[1];
+  else if((m=text.match(/Broj ponude:?\s*(\d{5,})/i))) meta.offerNo=m[1];
   if((m=text.match(/^Project(?:-No\.)?:?\s*(.+)$/im))) meta.project=m[1].trim();
   else if((m=text.match(/^Projekt(?:\s+br\.?)?:?\s*(.+)$/im))) meta.project=m[1].trim();
-  if(/^no\.?$/i.test(meta.project)) meta.project='';
+  if(/^no\.?$/i.test(meta.project)||/^br\.?$/i.test(meta.project)) meta.project='';
   if((m=text.match(/from\s+([A-Z][a-z]{2}\s+\d{1,2},\s+\d{4})/))) meta.date=m[1];
+  else if((m=text.match(/od\s+(\d{1,2}\.\s?\w+\s?\d{4}\.?)/i))) meta.date=m[1].trim();
   else if((m=text.match(/(\d{1,2}\.\s?\d{1,2}\.\s?\d{4}\.?)/))) meta.date=m[1];
   return meta;
 }
@@ -199,7 +203,6 @@ function parseOffer(pages){
   var allLines=[]; pages.forEach(function(p){allLines=allLines.concat(p);});
   var meta=extractMeta(allLines);
 
-  // čisti tok sadržaja (miče naslovnicu, ponovljena zaglavlja i podnožja stranica)
   var content=[], started=false;
   pages.forEach(function(page){
     var lines=page.filter(function(l){return !isFooter(l);});
@@ -208,30 +211,28 @@ function parseOffer(pages){
     else if(started){content=content.concat(lines);}
   });
 
-  // odreži na bloku totala (napomene s kraja ne ulaze u stavke)
   var stop=content.length;
   for(var i=0;i<content.length;i++){ if(isTotalsStart(content[i])){ stop=i; break; } }
   var body=content.slice(0,stop).filter(function(l){return l&&l.trim();});
 
-  // segmentacija sidrena na redak s cijenom; pozicija = prvi redak koji počinje
-  // brojem; sve prije pozicije (uvodni komentar) se odbacuje
   var items=[], leadNote='', start=0;
   for(var i=0;i<body.length;i++){
     var price=matchPrice(body[i]);
     if(!price) continue;
     var block=body.slice(start,i); start=i+1;
     var p=-1; for(var j=0;j<block.length;j++){ if(isPositionLine(block[j])){ p=j; break; } }
-    var pos='', descLines;
+    var pos='', excluded=price.excluded, descLines;
     if(p>=0){
-      var m=block[p].match(/^(\d+)\s+(.*)$/); pos=m[1];
-      descLines=(m[2].trim()?[m[2].trim()]:[]).concat(block.slice(p+1));
+      var m=block[p].match(/^(\d+)(\*)?\s+(.*)$/); pos=m[1];
+      if(m[2]) excluded=true; // zvjezdica uz broj pozicije (npr. "160*")
+      descLines=(m[3].trim()?[m[3].trim()]:[]).concat(block.slice(p+1));
       if(items.length===0&&p>0) leadNote=block.slice(0,p).join(' ').trim();
     } else { descLines=block.slice(); }
     var code=''; for(var k=0;k<descLines.length;k++){ var a=matchArticle(descLines[k]); if(a){code=a;break;} }
     descLines=descLines.filter(function(l){return !matchArticle(l);});
     var unit=price.unit; if(unit==null&&price.total!=null&&price.qty) unit=price.total/price.qty;
     items.push({pos:pos,code:code,description:descLines.join('\n').replace(/\n{3,}/g,'\n\n').trim(),
-                qty:price.qty,unit:unit,total:price.total,disc:price.disc});
+                qty:price.qty,unit:unit,total:price.total,disc:price.disc,excluded:excluded});
   }
 
   var totals={net:null,vatRate:null,vat:null,gross:null};
@@ -276,12 +277,8 @@ async function pdfToPages(buf){
 }
 
 /* ===================== izgradnja Excela =============================== */
-function estRowHeight(text,cpl){
-  var lines=0; String(text).split('\n').forEach(function(seg){lines+=Math.max(1,Math.ceil((seg.length||1)/cpl));});
-  return Math.min(600,Math.max(16,lines*13.5+4));
-}
 async function buildWorkbook(parsed,offerNo){
-  var INK='FF14161A',ACCENT='FFEE4B12',LIGHT='FFF3F4F6',LINE='FFDDE0E4',ZEBRA='FFFAFAFB';
+  var INK='FF14161A',ACCENT='FFEE4B12',LIGHT='FFF3F4F6',LINE='FFDDE0E4',ZEBRA='FFFAFAFB',ALTFILL='FFFFF3EC';
   var wb=new ExcelJS.Workbook(); wb.creator='Ponuda u Troškovnik'; wb.calcProperties={fullCalcOnLoad:true};
   var ws=wb.addWorksheet('Troškovnik',{views:[{showGridLines:false}],
     pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,
@@ -313,9 +310,6 @@ async function buildWorkbook(parsed,offerNo){
   });
   ws.getRow(HR).height=30;
 
-  // Dugi opisi se raspoređuju na više spojenih redaka (Excel ograničava visinu
-  // retka na ~409 pt). Broj prelomljenih redaka mjerimo stvarnom širinom teksta
-  // (canvas.measureText) da spojimo točno onoliko redaka koliko treba.
   var USABLE_PX=490, FONT_PX=13.33, LH=14, PAD=12, MAXH=405;
   var _mctx=null,_mtry=false;
   function measureCtx(){
@@ -337,9 +331,14 @@ async function buildWorkbook(parsed,offerNo){
     return lines;
   }
   function textHeight(text){ return Math.max(14,descLineCount(text)*LH+6); }
+
+  // ExcelJS reference po redu za svaku UKLJUČENU stavku (za SUM raspon)
+  var includedRefs=[];
   var firstItem=HR+1, r=firstItem;
   (parsed.items||[]).forEach(function(it,idx){
-    var text=it.description||'';
+    var isAlt=!!it.excluded;
+    var descText=it.description||'';
+    var text=isAlt?('[ALTERNATIVA – nije u zbroju] '+descText):descText;
     var H=textHeight(text)+PAD, rowsNeeded=Math.max(1,Math.ceil(H/MAXH));
     var top=r, bot=r+rowsNeeded-1;
     ws.getCell('A'+top).value=it.pos?Number(it.pos):(idx+1)*10;
@@ -347,6 +346,7 @@ async function buildWorkbook(parsed,offerNo){
     ws.getCell('C'+top).value=it.qty!=null?it.qty:null;
     ws.getCell('D'+top).value=it.unit!=null?it.unit:null;
     ws.getCell('E'+top).value=it.total!=null?it.total:null;
+    if(!isAlt&&it.total!=null) includedRefs.push('E'+top);
     if(rowsNeeded>1){ ['A','B','C','D','E'].forEach(function(col){ ws.mergeCells(col+top+':'+col+bot); }); }
     ws.getCell('A'+top).alignment={vertical:'top',horizontal:'center'};
     ws.getCell('B'+top).alignment={vertical:'top',horizontal:'left',wrapText:true};
@@ -357,7 +357,12 @@ async function buildWorkbook(parsed,offerNo){
     var per=Math.min(MAXH,Math.ceil(H/rowsNeeded));
     for(var rr=top;rr<=bot;rr++){
       ws.getRow(rr).height=per;
-      for(var c=1;c<=5;c++){var cell=ws.getRow(rr).getCell(c); cell.border=border; cell.font={name:'Calibri',size:10,color:{argb:INK}}; if(idx%2===1) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};}
+      for(var c=1;c<=5;c++){
+        var cell=ws.getRow(rr).getCell(c); cell.border=border;
+        cell.font={name:'Calibri',size:10,color:{argb:INK},italic:isAlt};
+        if(isAlt) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:ALTFILL}};
+        else if(idx%2===1) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};
+      }
     }
     r=bot+1;
   });
@@ -374,12 +379,23 @@ async function buildWorkbook(parsed,offerNo){
     row.height=20; var cur=r; r++; return cur;
   }
   var vat=(parsed.totals&&parsed.totals.vatRate)?parsed.totals.vatRate:25;
-  var netSum=(parsed.items||[]).reduce(function(a,it){return a+(it.total||0);},0);
+  var netSum=(parsed.items||[]).reduce(function(a,it){return a+((it.excluded||it.total==null)?0:it.total);},0);
   netSum=Math.round(netSum*100)/100;
   var vatAmt=Math.round(netSum*vat)/100, gross=Math.round((netSum+vatAmt)*100)/100;
-  var rNet=sumRow('Ukupan zbroj pozicija (neto):','SUM(E'+firstItem+':E'+lastItem+')',netSum,false);
+  // SUM samo preko uključenih stavki (alternative izostavljene), kao u ponudi.
+  var sumFormula=includedRefs.length?('SUM('+includedRefs.join(',')+')'):'0';
+  var rNet=sumRow('Ukupan zbroj pozicija (neto):',sumFormula,netSum,false);
   var rVat=sumRow(vat+'% PDV:','E'+rNet+'*'+(vat/100),vatAmt,false);
   sumRow('UKUPNO (bruto):','E'+rNet+'+E'+rVat,gross,true);
+
+  var hasAlt=(parsed.items||[]).some(function(it){return it.excluded;});
+  if(hasAlt){
+    var nr=ws.getRow(r); ws.mergeCells('A'+r+':E'+r);
+    nr.getCell(1).value='*) Stavke označene kao ALTERNATIVA nisu uključene u ukupni iznos.';
+    nr.getCell(1).font={name:'Calibri',size:9,italic:true,color:{argb:'FF888888'}};
+    nr.getCell(1).alignment={vertical:'middle',horizontal:'left',indent:1};
+    nr.height=16; r++;
+  }
 
   ws.views=[{state:'frozen',ySplit:HR,showGridLines:false}];
   if(lastItem>=firstItem) ws.autoFilter={from:{row:HR,column:1},to:{row:lastItem,column:5}};
@@ -389,7 +405,7 @@ async function buildWorkbook(parsed,offerNo){
 /* ============================ UI ===================================== */
 var $=function(s){return document.querySelector(s);};
 var drop=$('#drop'), fileInput=$('#file'), statusEl=$('#status'), result=$('#result');
-var current=null; // {wb, offerNo}
+var current=null;
 var fmt=new Intl.NumberFormat('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 function setStatus(html,spin){ statusEl.innerHTML=(spin?'<span class="spin"></span>':'')+html; }
@@ -426,16 +442,18 @@ async function handle(file){
 }
 
 function render(parsed,offerNo){
-  // meta
+  var included=parsed.items.filter(function(it){return !it.excluded;});
+  var altCount=parsed.items.length-included.length;
+
   $('#meta').innerHTML=[
     ['Referenca',offerNo],
     ['Projekt',parsed.meta.project||'—'],
     ['Datum',parsed.meta.date||'—'],
-    ['Stavki',String(parsed.items.length)]
+    ['Stavki',String(parsed.items.length)+(altCount?(' ('+altCount+' alt.)'):'')]
   ].map(function(x){return '<div><span>'+x[0]+'</span><b>'+escapeHtml(x[1])+'</b></div>';}).join('');
 
-  // kontrolni zbroj
-  var sum=parsed.items.reduce(function(a,it){return a+(it.total||0);},0);
+  // kontrolni zbroj samo preko uključenih stavki
+  var sum=included.reduce(function(a,it){return a+(it.total||0);},0);
   var net=parsed.totals.net;
   var check=$('#check');
   if(net!=null){
@@ -449,27 +467,33 @@ function render(parsed,offerNo){
     check.innerHTML=ic('check')+'<div>Zbroj stavki: <span class="num">'+fmt.format(sum)+'</span> EUR (neto). U ponudi nije nađen kontrolni total za usporedbu.</div>';
   }
 
-  // upozorenja za nepotpune stavke
   var probs=[];
   parsed.items.forEach(function(it){
     if(it.qty==null||it.total==null||it.unit==null) probs.push('Poz. '+(it.pos||'?')+': nedostaje '+[
       it.qty==null?'količina':null, it.unit==null?'jed. cijena':null, it.total==null?'ukupno':null
-    ].filter(Boolean).join(', ')+' — provjeri ručno.');
+    ].filter(Boolean).join(', ')+', provjeri ručno.');
   });
   var warns=$('#warns');
   if(probs.length){ warns.style.display='block'; warns.innerHTML=probs.map(function(p){return '<li>'+escapeHtml(p)+'</li>';}).join(''); }
   else warns.style.display='none';
 
-  // uvodni komentar iz ponude (prepoznat, ali namjerno izostavljen iz Excela)
+  var an=$('#altnote');
+  if(altCount){
+    var altPos=parsed.items.filter(function(it){return it.excluded;}).map(function(it){return it.pos||'?';});
+    an.style.display='block';
+    an.innerHTML='<b>Alternativne stavke</b> (poz. '+escapeHtml(altPos.join(', '))+') unesene su u Excel, ali nisu uključene u zbroj, kao u originalnoj ponudi.';
+  } else an.style.display='none';
+
   var ln=$('#leadnote');
   if(parsed.leadNote){ ln.style.display='block'; ln.innerHTML='<b>Napomena iz ponude</b> (nije uključena u Excel): '+escapeHtml(parsed.leadNote); }
   else ln.style.display='none';
 
-  // pregled
   var rows=parsed.items.map(function(it){
-    return '<tr>'+
-      '<td class="pos">'+escapeHtml(it.pos||'')+'</td>'+
-      '<td class="desc">'+escapeHtml(firstLine(it.description))+(it.code?'<span class="code">'+escapeHtml(it.code)+'</span>':'')+'</td>'+
+    return '<tr'+(it.excluded?' class="alt"':'')+'>'+
+      '<td class="pos">'+escapeHtml(it.pos||'')+(it.excluded?'*':'')+'</td>'+
+      '<td class="desc">'+escapeHtml(firstLine(it.description))+
+        (it.code?'<span class="code">'+escapeHtml(it.code)+'</span>':'')+
+        (it.excluded?'<span class="alttag">ALTERNATIVA, izvan zbroja</span>':'')+'</td>'+
       '<td class="n">'+(it.qty!=null?it.qty:'<span class="miss">—</span>')+'</td>'+
       '<td class="n">'+(it.unit!=null?fmt.format(it.unit):'<span class="miss">—</span>')+'</td>'+
       '<td class="n">'+(it.total!=null?fmt.format(it.total):'<span class="miss">—</span>')+'</td>'+
